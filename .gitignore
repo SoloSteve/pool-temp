@@ -1,0 +1,4 @@
+.idea/
+node-modules/
+venv/
+/mk2/Receiver/python/.idea/

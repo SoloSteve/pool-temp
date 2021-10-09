@@ -1,0 +1,163 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <!--  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, minimum-scale=1, user-scalable=no, minimal-ui, viewport-fit=cover">-->
+  <title>Pool Temperature</title>
+</head>
+<style>
+    body {
+        font-family: "Roboto Light", monospace;
+    }
+
+    #container {
+        position: absolute;
+        top: 2%;
+        left: 5%;
+        height: 38%;
+        width: 90%;
+        display: flex;
+        justify-content: space-around;
+    }
+
+    .chart-container {
+        position: absolute;
+        bottom: 0;
+        height: 50%;
+        width: 95%;
+    }
+
+    .sub-container {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+    }
+
+    .number {
+        font-size: 96px;
+    }
+
+    #water-number {
+        color: dodgerblue;
+        display: flex;
+    }
+
+    #change {
+        color: black;
+        font-size: 36px;
+    }
+</style>
+<body>
+<div id="container">
+  <div>
+    <div class="sub-container">
+      <span class="title">Water Temperature</span>
+      <br/>
+      <br/>
+      <canvas id="water-gauge"></canvas>
+      <div id="water-number">
+        <span class="number" id="temp"></span><span id="change"></span>
+      </div>
+    </div>
+  </div>
+  <div>
+    <div class="sub-container">
+      <span class="title">Outside Temperature</span>
+      <div class="number" id="outside-temp">36</div>
+    </div>
+  </div>
+</div>
+<div class="chart-container">
+  <canvas id="chart"></canvas>
+</div>
+</body>
+<script src="guage.min.js"></script>
+<script src="Chart.bundle.min.js"></script>
+<script>
+  const opts = {
+    angle: -0.2, // The span of the gauge arc
+    currval: 30,
+    lineWidth: 0.2, // The line thickness
+    radiusScale: 0.96, // Relative radius
+    fontSize: 44,
+    pointer: {
+      length: 0.49, // // Relative to gauge radius
+      strokeWidth: 0.035, // The thickness
+      color: '#000000' // Fill color
+    },
+    limitMax: true,     // If false, max value increases automatically if value > maxValue
+    limitMin: true,     // If true, the min value of the gauge will be fixed
+    generateGradient: true,
+    highDpiSupport: true,     // High resolution support
+    staticZones: [
+      {strokeStyle: "#F03E3E", min: 20, max: 30}, // Red from 100 to 130
+      {strokeStyle: "#FFDD00", min: 30, max: 32}, // Yellow
+      {strokeStyle: "#30B32D", min: 32, max: 34}, // Green
+    ],
+    staticLabels: {
+      font: "10px sans-serif",  // Specifies font
+      labels: [25, 30, 31, 32, 33, 34],  // Print labels at these values
+      color: "#000000",  // Optional: Label text color
+      fractionDigits: 0  // Optional: Numerical precision. 0=round off.
+    },
+  };
+
+  const target = document.getElementById("water-gauge"); // your canvas element
+  const gauge = new Gauge(target).setOptions(opts); // create sexy gauge!
+  gauge.minValue = 25;
+  gauge.maxValue = 34;
+  gauge.set(25);
+</script>
+<script>
+  const ctx = document.getElementById("chart");
+  const chart = new Chart(ctx, {
+    type: 'line',
+    data: {
+      datasets: [{
+        label: "Water Temperature History",
+        backgroundColor: "blue",
+        borderColor: "blue",
+        fill: false,
+        data: []
+      }]
+    },
+    options: {
+      maintainAspectRatio: false,
+      scales: {
+        xAxes: [{
+          type: 'time',
+          time: {
+            unit: 'hours',
+            tooltipFormat: 'll HH:mm',
+            parser: "MM/DD/YYYY HH:mm",
+            minUnit: "minute"
+          }
+        }]
+      }
+    }
+  })
+</script>
+<script>
+  setInterval(async () => {
+    let raw = await fetch("/raw");
+    raw = await raw.json();
+    raw.water = Math.round((raw.water + 0.3) * 10) / 10;
+    raw.outside = Math.round((raw.outside + 0.3) * 10) / 10;
+    gauge.set(raw.water);
+    document.getElementById("temp").innerHTML = `${raw.water}°C`;
+    document.getElementById("outside-temp").innerHTML = `${raw.outside}°C`
+
+    let growth = await fetch("/growth");
+    growth = await growth.json();
+    document.getElementById("change").innerHTML = `(${growth}°C/h)`
+
+    let history = await fetch("/history");
+    history = await history.json();
+    history = history.map((val) => {
+      return {y: val.value, x: new Date(val.date)}
+    });
+    chart.data.datasets[0].data = history;
+    chart.update();
+  }, 5 * 1000);
+</script>
+</html>
